@@ -1,8 +1,8 @@
 import { User } from "../models/user.model.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import getDataUri from "../utils/datauri.js";
-import cloudinary from "../utils/cloudinary.js";
+// import getDataUri from "../utils/datauri.js";
+import uploadCloudinary from "../utils/cloudinary.js";
 
 export const register = async (req, res) => {
   try {
@@ -14,10 +14,17 @@ export const register = async (req, res) => {
         success: false,
       });
     }
-    const file = req.file;
-    const fileUri = getDataUri(file);
-    const cloudResponse = await cloudinary.uploader.upload(fileUri.content);
 
+    // Check if the file is present in the request
+    const filePath = req.file;
+    if (!filePath?.path) {
+      return res.status(400).json({
+        message: "File is missing from the request",
+        success: false,
+      });
+    }
+
+    // Check if the user already exists
     const user = await User.findOne({ email });
     if (user) {
       return res.status(400).json({
@@ -25,7 +32,30 @@ export const register = async (req, res) => {
         success: false,
       });
     }
+
     const hashedPassword = await bcrypt.hash(password, 10);
+
+    let cloudResponse;
+    try {
+      cloudResponse = await uploadCloudinary(filePath.path, {
+        resource_type: "auto",
+      });
+      console.log("Upload successful:", cloudResponse?.secure_url);
+
+      if (!cloudResponse) {
+        return res.status(400).json({
+          message: "File upload failed.",
+          success: false,
+        });
+      }
+    } catch (uploadError) {
+      console.error("Cloudinary upload error:", uploadError);
+      return res.status(400).json({
+        message:
+          "File upload failed: " + (uploadError.message || "Unknown error"),
+        success: false,
+      });
+    }
 
     await User.create({
       fullname,
@@ -38,14 +68,21 @@ export const register = async (req, res) => {
       },
     });
 
+    console.log("User created successfully", fullname);
+
     return res.status(201).json({
       message: "Account created successfully.",
       success: true,
     });
   } catch (error) {
     console.log(error);
+    return res.status(500).json({
+      message: "Internal server error",
+      success: false,
+    });
   }
 };
+
 export const login = async (req, res) => {
   try {
     const { email, password, role } = req.body;
@@ -126,8 +163,16 @@ export const updateProfile = async (req, res) => {
 
     const file = req.file;
     // cloudinary ayega idhar
-    const fileUri = getDataUri(file);
-    const cloudResponse = await cloudinary.uploader.upload(fileUri.content);
+    if (!file.path) {
+      return res.status(400).json({
+        message: "File is missing from the request",
+        success: false,
+      });
+    }
+
+    const cloudResponse = await cloudinary.uploader.upload(file.path, {
+      resource_type: "auto",
+    });
 
     let skillsArray;
     if (skills) {

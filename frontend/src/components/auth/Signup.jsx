@@ -44,18 +44,43 @@ const Signup = () => {
     }
 
     try {
+      // Add this before making the axios request in submitHandler
+      if (!input.fullname || !input.email || !input.password || !input.role) {
+        toast.error("Please fill all required fields");
+        return;
+      }
+
+      console.log("Step 1: Form data prepared:");
+
+      // Email validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(input.email)) {
+        toast.error("Please enter a valid email address");
+        return;
+      }
+
       dispatch(setLoading(true));
+      console.log("Step 2: Response received:");
       const res = await axios.post(`${USER_API_END_POINT}/register`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
         withCredentials: true,
       });
-      if (error.response && error.response.data) {
-        toast.error(error.response.data.message);
-      } else {
-        toast.error("Network Error");
+
+      console.log("Step 3: Response received:", res.data);
+
+      // Handle successful response
+      if (res.data && res.data.success) {
+        toast.success(res.data.message || "Registration successful!");
+        navigate("/login"); // Redirect to login page
       }
     } catch (error) {
       console.log(error);
+      // Now handle the error properly
+      if (error.response && error.response.data) {
+        toast.error(error.response.data.message);
+      } else {
+        toast.error("Network Error or Server not responding");
+      }
     } finally {
       dispatch(setLoading(false));
     }
@@ -65,7 +90,7 @@ const Signup = () => {
     if (user) {
       navigate("/");
     }
-  }, []);
+  }, [user, navigate]);
   return (
     <div>
       <Navbar />
