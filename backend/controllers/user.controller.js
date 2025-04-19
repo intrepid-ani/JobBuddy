@@ -24,6 +24,14 @@ export const register = async (req, res) => {
       });
     }
 
+    if (filePath.size > 10 * 1024 * 1024) {
+      // 10MB limit example
+      return res.status(400).json({
+        message: "File size exceeds limit (max 10MB)",
+        success: false,
+      });
+    }
+
     // Check if the user already exists
     const user = await User.findOne({ email });
     if (user) {
@@ -170,7 +178,7 @@ export const updateProfile = async (req, res) => {
       });
     }
 
-    const cloudResponse = await cloudinary.uploader.upload(file.path, {
+    const cloudResponse = await uploadCloudinary(file.path, {
       resource_type: "auto",
     });
 
@@ -217,6 +225,10 @@ export const updateProfile = async (req, res) => {
       success: true,
     });
   } catch (error) {
+    res.json({
+      message: "Internal server error, While updating profile.",
+      success: false,
+    });
     console.log(error);
   }
 };

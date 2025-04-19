@@ -1,5 +1,5 @@
 import { Company } from "../models/company.model.js";
-import cloudinary from "../utils/cloudinary.js";
+import uploadOnCloudinary from "../utils/cloudinary.js";
 
 export const registerCompany = async (req, res) => {
   try {
@@ -76,12 +76,27 @@ export const updateCompany = async (req, res) => {
     // idhar cloudinary ayega
     if (!file) {
       return res.status(400).json({
+        message: "File is required",
+        success: false,
+      });
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      // 10MB limit example
+      return res.status(400).json({
+        message: "File size exceeds limit (max 10MB)",
+        success: false,
+      });
+    }
+
+    if (!file.path) {
+      return res.status(400).json({
         message: "File is missing from the request",
         success: false,
       });
     }
-    filePath = file.path;
-    const cloudResponse = await cloudinary.uploader.upload(filePath, {
+    const filePath = file.path;
+    const cloudResponse = await uploadOnCloudinary(filePath, {
       resource_type: "auto",
     });
     const logo = cloudResponse.secure_url;
@@ -104,5 +119,10 @@ export const updateCompany = async (req, res) => {
     });
   } catch (error) {
     console.log(error);
+    return res.status(500).json({
+      message: "Error updating company information",
+      error: error.message,
+      success: false,
+    });
   }
 };

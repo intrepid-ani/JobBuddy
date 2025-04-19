@@ -16,20 +16,26 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_CLIENT_SECRET,
 });
 
-const uploadOnCloudinary = async (localFilePath) => {
-  try {
-    if (!localFilePath) return null;
-    //upload the file on cloudinary
-    const response = await cloudinary.uploader.upload(localFilePath, {
-      resource_type: "auto",
-    });
-    // file has been uploaded successfull
-    //console.log("file is uploaded on cloudinary ", response.secure_url);
-    fs.unlinkSync(localFilePath);
-    return response;
-  } catch (error) {
-    fs.unlinkSync(localFilePath); // remove the locally saved temporary file as the upload operation got failed
-    return null;
+// Add retry logic to the upload function
+const uploadOnCloudinary = async (filePath, options = {}, maxRetries = 3) => {
+  let retries = 0;
+
+  while (retries < maxRetries) {
+    try {
+      const result = await cloudinary.uploader.upload(filePath, options);
+      return result;
+    } catch (error) {
+      retries++;
+
+      if (error.code === "ECONNRESET" && retries < maxRetries) {
+        // Wait before retrying (exponential backoff)
+        await new Promise((resolve) => setTimeout(resolve, 1000 * retries));
+        console.log(`Retrying upload. Attempt ${retries} of ${maxRetries}`);
+      } else {
+        // If not a connection reset or we've exhausted retries, throw the error
+        throw error;
+      }
+    }
   }
 };
 
