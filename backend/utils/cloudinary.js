@@ -23,6 +23,14 @@ const uploadOnCloudinary = async (filePath, options = {}, maxRetries = 3) => {
   while (retries < maxRetries) {
     try {
       const result = await cloudinary.uploader.upload(filePath, options);
+      // Delete the file from the server after successful upload
+      fs.unlink(filePath, (err) => {
+        if (err) {
+          console.error(`Failed to delete temporary file at ${filePath}:`, err);
+        } else {
+          console.log(`Successfully deleted temporary file: ${filePath}`);
+        }
+      });
       return result;
     } catch (error) {
       retries++;
