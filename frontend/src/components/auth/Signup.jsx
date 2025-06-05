@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { useDispatch, useSelector } from "react-redux";
 import { setLoading } from "@/redux/authSlice";
 import { Loader2 } from "lucide-react";
+import { data } from "autoprefixer";
 
 const Signup = () => {
   const [input, setInput] = useState({
@@ -20,6 +21,8 @@ const Signup = () => {
     password: "",
     role: "",
     file: "",
+    recoveryQuestion: "select",
+    recoveryAnswer: "",
   });
   const { loading, user } = useSelector((store) => store.auth);
   const dispatch = useDispatch();
@@ -39,13 +42,22 @@ const Signup = () => {
     formData.append("phoneNumber", input.phoneNumber);
     formData.append("password", input.password);
     formData.append("role", input.role);
+    formData.append("recoveryQuestion", input.recoveryQuestion);
+    formData.append("recoveryAnswer", input.recoveryAnswer);
     if (input.file) {
       formData.append("file", input.file);
     }
 
     try {
       // Add this before making the axios request in submitHandler
-      if (!input.fullname || !input.email || !input.password || !input.role) {
+      if (
+        !input.fullname ||
+        !input.email ||
+        !input.password ||
+        !input.role ||
+        input.recoveryQuestion === "select" ||
+        !input.recoveryAnswer
+      ) {
         toast.error("Please fill all required fields");
         return;
       }
@@ -138,6 +150,45 @@ const Signup = () => {
               name="password"
               onChange={changeEventHandler}
               placeholder="password"
+            />
+          </div>
+          <div className="my-2">
+            <Label htmlFor="selQuestion">Recovery Question</Label>
+            <br />
+            <select
+              id="recoveryQuestion"
+              name="recoveryQuestion"
+              className="w-full h-10 px-2.5 border rounded-md text-gray-500"
+              onChange={changeEventHandler}
+              value={input.recoveryQuestion}
+            >
+              <option
+                disabled
+                selected
+                className="text-gray-500"
+                value="select"
+              >
+                Select
+              </option>
+              <option value="What's your pet name?">
+                What's your pet name?
+              </option>
+              <option value="What was your chilhood nickname?">
+                What was your chilhood nickname?
+              </option>
+              <option value="Which city you born in?">
+                Which city you born in?
+              </option>
+            </select>
+          </div>
+          <div className="my-2">
+            <Label>Your Answer</Label>
+            <Input
+              type="text"
+              value={input.recoveryAnswer}
+              name="recoveryAnswer"
+              onChange={changeEventHandler}
+              placeholder={"Your Answer"}
             />
           </div>
           <div className="flex items-center justify-between">

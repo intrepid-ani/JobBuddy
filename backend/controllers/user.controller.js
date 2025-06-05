@@ -6,9 +6,25 @@ import uploadCloudinary from "../utils/cloudinary.js";
 
 export const register = async (req, res) => {
   try {
-    const { fullname, email, phoneNumber, password, role } = req.body;
+    const {
+      fullname,
+      email,
+      phoneNumber,
+      password,
+      role,
+      recoveryQuestion,
+      recoveryAnswer,
+    } = req.body;
 
-    if (!fullname || !email || !phoneNumber || !password || !role) {
+    if (
+      !fullname ||
+      !email ||
+      !phoneNumber ||
+      !password ||
+      !role ||
+      !recoveryAnswer ||
+      recoveryQuestion === "select"
+    ) {
       return res.status(400).json({
         message: "Something is missing",
         success: false,
@@ -71,12 +87,14 @@ export const register = async (req, res) => {
       phoneNumber,
       password: hashedPassword,
       role,
+      recoveryQuestion,
+      recoveryAnswer,
       profile: {
         profilePhoto: cloudResponse.secure_url,
       },
     });
 
-    console.log("User created successfully", fullname);
+    console.log("User created successfully", recoveryAnswer);
 
     return res.status(201).json({
       message: "Account created successfully.",
@@ -93,44 +111,137 @@ export const register = async (req, res) => {
 
 export const login = async (req, res) => {
   try {
-    const { email, password, role } = req.body;
+    console.log("Entered Login Route");
 
-    if (!email || !password || !role) {
-      return res.status(400).json({
-        message: "Something is missing",
-        success: false,
-      });
-    }
-    let user = await User.findOne({ email });
-    if (!user) {
-      return res.status(400).json({
-        message: "Incorrect email or password.",
-        success: false,
-      });
-    }
-    const isPasswordMatch = await bcrypt.compare(password, user.password);
-    if (!isPasswordMatch) {
-      return res.status(400).json({
-        message: "Incorrect email or password.",
-        success: false,
-      });
-    }
-    // check role is correct or not
-    if (role !== user.role) {
-      return res.status(400).json({
-        message: "Account doesn't exist with current role.",
-        success: false,
+    const {
+      email,
+      password,
+      role,
+      forgotPassword,
+      recoveryAnswer,
+      recoveryQuestion,
+      newPassword,
+    } = req.body;
+
+    // Shared user/token variables
+    let user;
+    let token;
+
+    // Forgot Password Flow
+    if (forgotPassword) {
+      console.log("Forgot Password Flow Triggered");
+
+      // Validation
+      if (
+        !email ||
+        !recoveryAnswer ||
+        !recoveryQuestion ||
+        recoveryQuestion === "select" || // Changed to lowercase for consistency
+        !role
+      ) {
+        return res.status(400).json({
+          message: "Missing required fields!",
+          success: false,
+        });
+      }
+
+      user = await User.findOne({ email });
+
+      if (!user) {
+        return res.status(400).json({
+          message: "Incorrect email or user not found.",
+          success: false,
+        });
+      }
+
+      if (role !== user.role) {
+        return res.status(400).json({
+          message: "Account doesn't exist with the specified role.",
+          success: false,
+        });
+      }
+
+      // Case-insensitive comparison for recovery answer
+      if (
+        recoveryAnswer.toLowerCase() !== user.recoveryAnswer.toLowerCase() ||
+        recoveryQuestion !== user.recoveryQuestion
+      ) {
+        return res.status(400).json({
+          message: "Recovery question or answer is incorrect!",
+          success: false,
+        });
+      }
+
+      // If newPassword is provided, update the password and proceed to login
+      if (newPassword) {
+        if (newPassword.length < 6) {
+          // Basic password validation
+          return res.status(400).json({
+            message: "New password must be at least 6 characters long.",
+            success: false,
+          });
+        }
+
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        user.password = hashedPassword;
+        await user.save();
+        console.log("Password reset successful");
+
+        // Generate token after password is reset
+        token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET_KEY, {
+          expiresIn: "1d",
+        });
+      } else {
+        // If no new password provided, ONLY return verification success - DON'T LOGIN
+        return res.status(200).json({
+          message:
+            "Recovery verification successful. Please set a new password.",
+          userId: user._id,
+          verified: true,
+          success: true,
+        });
+      }
+    } else {
+      // Normal Login Flow - remains the same
+      if (!email || !password || !role) {
+        return res.status(400).json({
+          message: "Email, password, and role are required.",
+          success: false,
+        });
+      }
+
+      user = await User.findOne({ email });
+
+      if (!user) {
+        return res.status(400).json({
+          message: "Incorrect email or password.",
+          success: false,
+        });
+      }
+
+      const isPasswordMatch = await bcrypt.compare(password, user.password);
+
+      if (!isPasswordMatch) {
+        return res.status(400).json({
+          message: "Incorrect email or password.",
+          success: false,
+        });
+      }
+
+      if (role !== user.role) {
+        return res.status(400).json({
+          message: "Account doesn't exist with the specified role.",
+          success: false,
+        });
+      }
+
+      token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET_KEY, {
+        expiresIn: "1d",
       });
     }
 
-    const tokenData = {
-      userId: user._id,
-    };
-    const token = await jwt.sign(tokenData, process.env.JWT_SECRET_KEY, {
-      expiresIn: "1d",
-    });
-
-    user = {
+    // Format user object before sending
+    const userData = {
       _id: user._id,
       fullname: user.fullname,
       email: user.email,
@@ -142,19 +253,24 @@ export const login = async (req, res) => {
     return res
       .status(200)
       .cookie("token", token, {
-        maxAge: 1 * 24 * 60 * 60 * 1000,
-        httpsOnly: true,
+        maxAge: 24 * 60 * 60 * 1000, // 1 day
+        httpOnly: true,
         sameSite: "strict",
       })
       .json({
-        message: `Welcome back ${user.fullname}`,
-        user,
+        message: `Welcome back, ${user.fullname}!`,
+        user: userData,
         success: true,
       });
   } catch (error) {
-    console.log(error);
+    console.error("Error during login:", error.message);
+    return res.status(500).json({
+      message: "Server error. Please try again later.",
+      success: false,
+    });
   }
 };
+
 export const logout = async (req, res) => {
   try {
     return res.status(200).cookie("token", "", { maxAge: 0 }).json({
