@@ -31,7 +31,7 @@ app.use("/api/v1/company", companyRoute);
 app.use("/api/v1/job", jobRoute);
 app.use("/api/v1/application", applicationRoute);
 
-app.get("/", (res, req) => {
+app.get("/", (req, res) => {
   res.json({
     apiProvider: "JobBuddy.com",
     status: "ok",
