@@ -17,7 +17,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 const corsOptions = {
-  origin: "https://jobbuddy-ani.netlify.app",
+  origin: "https://job-buddy-9bc5.vercel.app",
   credentials: true,
 };
 
